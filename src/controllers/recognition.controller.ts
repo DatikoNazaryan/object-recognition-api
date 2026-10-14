@@ -105,7 +105,6 @@ export const getRecognitionHistory = async (
         success: false,
         message: 'Unauthorized',
       });
-
       return;
     }
 
@@ -114,26 +113,60 @@ export const getRecognitionHistory = async (
         ? req.query.search
         : '';
 
-    const recognitions = await getRecognitions(
+    const pageValue = req.query.page ?? '1';
+    const limitValue = req.query.limit ?? '10';
+
+    if (
+      typeof pageValue !== 'string' ||
+      typeof limitValue !== 'string' ||
+      !/^[1-9]\d*$/.test(pageValue) ||
+      !/^[1-9]\d*$/.test(limitValue)
+    ) {
+      res.status(400).json({
+        success: false,
+        message: 'Page and limit must be positive integers',
+      });
+      return;
+    }
+
+    const page = Number(pageValue);
+    const limit = Number(limitValue);
+
+    if (
+      !Number.isSafeInteger(page) ||
+      !Number.isSafeInteger(limit) ||
+      limit > 100
+    ) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid page or limit. Maximum limit is 100',
+      });
+      return;
+    }
+
+    const result = await getRecognitions(
       req.user.id,
       search,
+      page,
+      limit,
     );
 
     res.status(200).json({
       success: true,
-      recognitions,
+      recognitions: result.recognitions,
+      page: result.page,
+      limit: result.limit,
+      total: result.total,
+      totalPages: result.totalPages,
+      hasNextPage: result.hasNextPage,
+      hasPreviousPage: result.hasPreviousPage,
     });
-
   } catch (error) {
-    console.error(
-      'Get recognition history error:',
-      error,
-    );
+    console.error('Get recognition history error:', error);
 
     res.status(500).json({
       success: false,
-      message:
-        'Failed to get recognition history',
+      message: 'Failed to get recognition history',
     });
   }
 };

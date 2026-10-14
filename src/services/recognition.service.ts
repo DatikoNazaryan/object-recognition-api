@@ -106,26 +106,48 @@ export const createRecognition = async ({
 
 export const getRecognitions = async (
   userId: string,
-  search?: string,
+  search = '',
+  page = 1,
+  limit = 10,
 ) => {
-  return prisma.recognition.findMany({
-    where: {
-      userId,
-      ...(search?.trim()
-        ? {
-          name: {
-            contains: search.trim(),
-            mode: 'insensitive',
-          },
-        }
-        : {}),
-    },
-    orderBy: {
-      createdAt: 'desc',
-    },
-  });
-};
+  const skip = (page - 1) * limit;
 
+  const where = {
+    userId,
+    ...(search.trim()
+      ? {
+        name: {
+          contains: search.trim(),
+          mode: 'insensitive' as const,
+        },
+      }
+      : {}),
+  };
+
+  const [recognitions, total] = await Promise.all([
+    prisma.recognition.findMany({
+      where,
+      orderBy: {
+        createdAt: 'desc',
+      },
+      skip,
+      take: limit,
+    }),
+    prisma.recognition.count({ where }),
+  ]);
+
+  const totalPages = Math.ceil(total / limit);
+
+  return {
+    recognitions,
+    page,
+    limit,
+    total,
+    totalPages,
+    hasNextPage: page < totalPages,
+    hasPreviousPage: page > 1,
+  };
+};
 
 export const getRecognitionById = async (
   id: string,
